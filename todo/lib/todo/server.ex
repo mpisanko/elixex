@@ -2,15 +2,15 @@ defmodule Todo.Server do
   use GenServer
 
   def start do
-    GenServer.start(Todo.Server, nil, name: :todo_server)
+    GenServer.start(Todo.Server, nil)
   end
 
-  def add_entry(new_entry) do
-    GenServer.cast(:todo_server, {:add_entry, new_entry})
+  def add_entry(todo_sever, new_entry) do
+    GenServer.cast(todo_sever, {:add_entry, new_entry})
   end
 
-  def entries(date) do
-    GenServer.call(:todo_server, {:entries, date})
+  def entries(todo_sever, date) do
+    GenServer.call(todo_sever, {:entries, date})
   end
 
   def init(_) do
