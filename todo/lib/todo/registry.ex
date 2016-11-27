@@ -2,8 +2,30 @@ defmodule Todo.ProcessRegistry do
   use GenServer
   import Kernel, except: [send: 2]
 
+  def start_link do
+    IO.puts "Starting Registry"
+    GenServer.start_link(__MODULE__, nil, name: :process_registry)
+  end
+
   def init(_) do
     {:ok, HashDict.new}
+  end
+
+  def send(key, message) do
+    case whereis_name(key) do
+      :undefined -> {:badarg, {key, message}}
+      pid ->
+        Kernel.send(pid, message)
+        pid
+    end
+  end
+
+  def register_name(key, pid) do
+    GenServer.call(:process_registry, {:register_name, key, pid})
+  end
+
+  def whereis_name(name) do
+    GenServer.call(:process_registry, {:whereis_name, name})
   end
 
   def handle_call({:register_name, key, pid}, _, process_registry) do
@@ -24,20 +46,17 @@ defmodule Todo.ProcessRegistry do
     }
   end
 
-  def send(key, message) do
-    case whereis_name(key) do
-      :undefined -> {:badarg, {key, message}}
-      pid ->
-        Kernel.send(pid, messaage)
-        pid
-    end
-  end
-
   def handle_info({:DOWN, _, :process, pid, _}, process_registry) do
-    {:noreply, :deregister_pid(process_registry, pid)}
+    {:noreply, deregister_pid(process_registry, pid)}
   end
 
   defp deregister_pid(process_registry, pid) do
-    HashDict.delete(process_registry, pid)
+    Enum.reduce(process_registry, process_registry,
+      fn({proc_alias, registered_pid}, registry_acc) when registered_pid == pid ->
+        HashDict.delete(registry_acc, proc_alias)
+
+        (_, registry_acc) -> registry_acc
+      end
+    )
   end
 end

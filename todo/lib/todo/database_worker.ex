@@ -1,18 +1,18 @@
 defmodule Todo.DatabaseWorker do
   use GenServer
 
-  def start_link(db_folder) do
-    IO.puts "Starting Database Worker."
+  def start_link(db_folder, worker_id) do
+    IO.puts "Starting Database Worker. #{worker_id}"
 
-    GenServer.start_link(__MODULE__, db_folder)
+    GenServer.start_link(__MODULE__, db_folder, name: via_tuple(worker_id))
   end
 
-  def store(worker, key, value) do
-    GenServer.cast(worker, {:store, key, value})
+  def store(worker_id, key, value) do
+    GenServer.cast(via_tuple(worker_id), {:store, key, value})
   end
 
-  def get(worker, key) do
-    GenServer.call(worker, {:get, key})
+  def get(worker_id, key) do
+    GenServer.call(via_tuple(worker_id), {:get, key})
   end
 
   def init(db_folder) do
@@ -27,7 +27,7 @@ defmodule Todo.DatabaseWorker do
     {:noreply, db_folder}
   end
 
-  def handle_call({:get, key}, caller, db_folder) do
+  def handle_call({:get, key}, _, db_folder) do
     data = case File.read(file_name(db_folder, key)) do
               {:ok, contents} -> :erlang.binary_to_term(contents)
               _               -> nil
@@ -36,4 +36,6 @@ defmodule Todo.DatabaseWorker do
   end
 
   defp file_name(db_folder, key), do: "#{db_folder}/#{key}"
+
+  defp via_tuple(worker_id), do: {:via, Todo.ProcessRegistry, {:database_server, worker_id}}
 end

@@ -1,10 +1,12 @@
 defmodule Todo.Database do
   use GenServer
 
+  @pool_size 3
+
   def start_link(db_folder) do
     IO.puts "Starting Database."
 
-    GenServer.start_link(__MODULE__, db_folder, name: :database_server)
+    Todo.PoolSupervisor.start_link(db_folder, @pool_size)
   end
 
   def store(key, value) do
@@ -19,25 +21,8 @@ defmodule Todo.Database do
     |> Todo.DatabaseWorker.get(key)
   end
 
-  def choose_worker(key) do
-    GenServer.call(:database_server, {:get_worker, key})
+  defp choose_worker(key) do
+    :erlang.phash2(key, @pool_size) + 1
   end
 
-  def init(db_folder) do
-    File.mkdir_p(db_folder)
-    worker_pids =
-      0..2
-      |> Enum.reduce(HashDict.new, fn (i, acc) ->
-        {:ok, worker} = Todo.DatabaseWorker.start_link(db_folder)
-        HashDict.put(acc, i, worker)
-      end)
-    {:ok, worker_pids}
-  end
-
-  def handle_call({:get_worker, key}, _, worker_pids) do
-    worker_pid = HashDict.get(worker_pids, :erlang.phash2(key, 3))
-    {:reply, worker_pid, worker_pids}
-  end
-
-  def handle_info(_, state), do: {:noreply, state}
 end
